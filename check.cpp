@@ -11,53 +11,55 @@ using namespace sf;
 //the pacman main thread
 void* PACMAN(void* input){
     float timer;
+    //sem_post(&reader);
     while(1){
         //do something
-        
+
         timer += pacClock.getElapsedTime().asMilliseconds();
         pacClock.restart();
         //all movement is locked under a critical section
-        sem_wait(&reader);
+        if(pacMovement== " "){
+            //sem_wait(&reader);
+            goto exitPACMAN;
+        }
+         sem_wait(&reader2);
         if(timer >= 200){
+
          if(pacMovement == "R"){
             if(Grid[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)+1] == 1){
             pacMovement = " ";
-             
+
             goto exitPACMAN;
             }
             pacman.move(20,0);
-           
+
             }
         else if(pacMovement == "L"){
-           
+
             if(Grid[(int)pacman.getPosition().y/20][(((int)pacman.getPosition().x-1)/20)] == 1){
                 //pacman.move(1,0);
                 pacMovement = " ";
-                
+
                 goto exitPACMAN;
             }
             pacman.move(-20,0);
-           
+
         }
         else if(pacMovement == "U"){
-            
+
             if(Grid[((int)pacman.getPosition().y/20)-1][((int)pacman.getPosition().x/20)] == 1){
             pacMovement = " ";
-           
+
             goto exitPACMAN;
             }
             pacman.move(0,-20);
-             
         }
         else if(pacMovement == "D"){
-            
             if(Grid[((int)pacman.getPosition().y/20)+1][((int)pacman.getPosition().x/20)] == 1){
             pacMovement = " ";
-           
             goto exitPACMAN;
             }
             pacman.move(0,20);
-           
         }
             timer=0;
         }     //sample critical section.
@@ -66,8 +68,8 @@ void* PACMAN(void* input){
         sem_post(&reader);
         readCount = 1;
         //write
-    }  
-    
+    }
+
     //exit the thread
     pthread_exit(0);
 }
@@ -77,7 +79,7 @@ void* GameEngine(void* input){
     pthread_t pacThread;
     pthread_create(&pacThread,0,PACMAN,0);
     //pacman thread calling ends here.
-    
+
     while (window.isOpen())
     {
         sf::Event event;
@@ -88,6 +90,7 @@ void* GameEngine(void* input){
                 window.close();
             }
         }
+        sem_wait(&reader);
         //input thread is also the gameEngine thread.
         if(Keyboard::isKeyPressed(Keyboard::A)){
                 pacMovement = "L";
@@ -101,14 +104,14 @@ void* GameEngine(void* input){
         if(Keyboard::isKeyPressed(Keyboard::S)){
                 pacMovement = "D";
             }
-        sem_wait(&reader);
+        
         pthread_mutex_lock(&lock);
         window.clear();
         window.draw(background); //read function
         window.draw(pacman); //read function
         window.display();
         window.setActive(false);
-        sem_post(&reader);
+        sem_post(&reader2);
         pthread_mutex_unlock(&lock);
     }
     pthread_exit(0);
@@ -131,7 +134,7 @@ void* UserInterface(void* input){
             float animator = clock.getElapsedTime().asMilliseconds();
             pacAnim+=animator;
             clock.restart();
-            
+
             if(pacAnim >=150){
             if(frame >=2){
                 frame = 0;
@@ -150,9 +153,13 @@ void* UserInterface(void* input){
 int main(){
     pthread_t win,ui;
     window.setActive(false);
-    sem_init(&reader,0,1);
+    sem_init(&reader,0,0);
     pthread_create(&win,0,GameEngine,(void*)500);
     pthread_create(&ui,0,UserInterface,0);
     pthread_exit(0);
-    return 0;   
+    return 0;
 }
+
+//main -> ui thread, (game engine-> pacman).
+//pacman thread updates position x and y rendered by game-engine(correct draw position). game engine(movement direction)
+//ui thread only has read access and change access pacman.x pacman.y (pacman.Texture).
