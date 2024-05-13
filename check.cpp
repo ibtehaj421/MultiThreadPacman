@@ -1,6 +1,8 @@
 #include<iostream>
 #include<string>
 #include<pthread.h>
+#include<math.h>
+#include <semaphore.h>
 #include <SFML/Graphics.hpp>
 #include "array.h"
 #include "setup.h"
@@ -9,36 +11,63 @@ using namespace sf;
 //the pacman main thread
 void* PACMAN(void* input){
     float timer;
-    while(!allThreadKiller){
+    while(1){
         //do something
+        
         timer += pacClock.getElapsedTime().asMilliseconds();
         pacClock.restart();
         //all movement is locked under a critical section
-        pthread_mutex_lock(&lock);
-        if(timer >= 30){
-        if(pacMovement == "R"){
-            pacman.move(1,0);
+        sem_wait(&reader);
+        if(timer >= 200){
+         if(pacMovement == "R"){
+            if(Grid[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)+1] == 1){
+            pacMovement = " ";
+             
+            goto exitPACMAN;
+            }
+            pacman.move(20,0);
+           
             }
         else if(pacMovement == "L"){
-            pacman.move(-1,0);
+           
+            if(Grid[(int)pacman.getPosition().y/20][(((int)pacman.getPosition().x-1)/20)] == 1){
+                //pacman.move(1,0);
+                pacMovement = " ";
+                
+                goto exitPACMAN;
+            }
+            pacman.move(-20,0);
+           
+        }
+        else if(pacMovement == "U"){
+            
+            if(Grid[((int)pacman.getPosition().y/20)-1][((int)pacman.getPosition().x/20)] == 1){
+            pacMovement = " ";
+           
+            goto exitPACMAN;
+            }
+            pacman.move(0,-20);
+             
+        }
+        else if(pacMovement == "D"){
+            
+            if(Grid[((int)pacman.getPosition().y/20)+1][((int)pacman.getPosition().x/20)] == 1){
+            pacMovement = " ";
+           
+            goto exitPACMAN;
+            }
+            pacman.move(0,20);
+           
         }
             timer=0;
         }     //sample critical section.
         //check for wall colision based on current movement direction..
-        if(pacMovement == "R"){
-        if(Grid[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)+1] == 1){
-            pacMovement = " ";
-            }
-        }
-        else if(pacMovement == "L"){
-            if(Grid[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)] == 1){
-                pacman.move(1,0);
-                pacMovement = " ";
-            }
-        }
-        pthread_mutex_unlock(&lock);
-        
-    }
+        exitPACMAN:
+        sem_post(&reader);
+        readCount = 1;
+        //write
+    }  
+    
     //exit the thread
     pthread_exit(0);
 }
@@ -51,8 +80,6 @@ void* GameEngine(void* input){
     
     while (window.isOpen())
     {
-        
-        
         sf::Event event;
         while (window.pollEvent(event))
         {
@@ -64,18 +91,25 @@ void* GameEngine(void* input){
         //input thread is also the gameEngine thread.
         if(Keyboard::isKeyPressed(Keyboard::A)){
                 pacMovement = "L";
-        }
-         if(Keyboard::isKeyPressed(Keyboard::D)){
+            }
+        if(Keyboard::isKeyPressed(Keyboard::D)){
                 pacMovement = "R";
-        }
+            }
+        if(Keyboard::isKeyPressed(Keyboard::W)){
+                pacMovement = "U";
+            }
+        if(Keyboard::isKeyPressed(Keyboard::S)){
+                pacMovement = "D";
+            }
+        sem_wait(&reader);
         pthread_mutex_lock(&lock);
         window.clear();
-        window.draw(background);
-         
-        window.draw(pacman);
+        window.draw(background); //read function
+        window.draw(pacman); //read function
         window.display();
         window.setActive(false);
-       pthread_mutex_unlock(&lock);
+        sem_post(&reader);
+        pthread_mutex_unlock(&lock);
     }
     pthread_exit(0);
 }
@@ -97,7 +131,8 @@ void* UserInterface(void* input){
             float animator = clock.getElapsedTime().asMilliseconds();
             pacAnim+=animator;
             clock.restart();
-            if(pacAnim >=120){
+            
+            if(pacAnim >=150){
             if(frame >=2){
                 frame = 0;
             }
@@ -115,11 +150,9 @@ void* UserInterface(void* input){
 int main(){
     pthread_t win,ui;
     window.setActive(false);
-    
+    sem_init(&reader,0,1);
     pthread_create(&win,0,GameEngine,(void*)500);
     pthread_create(&ui,0,UserInterface,0);
-    
-    
     pthread_exit(0);
     return 0;   
 }
