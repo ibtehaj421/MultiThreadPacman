@@ -11,6 +11,7 @@ Texture bgt;
 sf::CircleShape shape(100.f);
 Sprite pacman;
 Texture pc;
+Texture Coin;
 float pacAnim;
 bool GAME = true;
 std::string pacMovement = " ";
@@ -20,4 +21,16 @@ Clock pacClock;
 int readCount = 0; //initially set the read count to zero to basically restrict the write lock mechanism.
 sem_t reader;
 sem_t reader2;
+sem_t readCounter;
+Text score;
+Text pointNum;
+Font retro;
+int points;
 //signal all threads to finish execution.
+struct pellet
+{
+    Sprite coin;
+    bool status = true; //initially set as true as each pellet can be spawned and eaten will be set to false once a pellet gets eaten until re spawning of pellets.
+};
+struct pellet pellets[30][25];
+
