@@ -22,12 +22,13 @@ void* PACMAN(void* input){
             //sem_wait(&reader);
             goto exitPACMAN;
         }
-         sem_wait(&reader2);
+        sem_wait(&reader2);
+        //game grid reading semaphore -> 4 ghosts and 1 pacman grid access.
         if(timer >= 200){
 
          if(pacMovement == "R"){
             if(Grid[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)+1] == 1){
-            pacMovement = " ";
+            pacMovement = " "; //made a semaphore to give access to the written values for movement by the game engine.
 
             goto exitPACMAN;
             }
@@ -67,7 +68,7 @@ void* PACMAN(void* input){
         exitPACMAN:
         sem_post(&reader);
         readCount = 1;
-        //write
+        //write.
     }
 
     //exit the thread
@@ -90,7 +91,7 @@ void* GameEngine(void* input){
                 window.close();
             }
         }
-        sem_wait(&reader);
+        sem_wait(&reader); // will probably go the value 5.
         //input thread is also the gameEngine thread.
         if(Keyboard::isKeyPressed(Keyboard::A)){
                 pacMovement = "L";
@@ -154,6 +155,7 @@ int main(){
     pthread_t win,ui;
     window.setActive(false);
     sem_init(&reader,0,0);
+    sem_init(&reader2,0,0);
     pthread_create(&win,0,GameEngine,(void*)500);
     pthread_create(&ui,0,UserInterface,0);
     pthread_exit(0);
