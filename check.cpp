@@ -29,8 +29,17 @@ void* PACMAN(void* input){
          if(pacMovement == "R"){
             if(Grid[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)+1] == 1){
             pacMovement = " "; //made a semaphore to give access to the written values for movement by the game engine.
-
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+               
+            }
             goto exitPACMAN;
+            }
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+                
             }
             pacman.move(20,0);
 
@@ -40,8 +49,17 @@ void* PACMAN(void* input){
             if(Grid[(int)pacman.getPosition().y/20][(((int)pacman.getPosition().x-1)/20)] == 1){
                 //pacman.move(1,0);
                 pacMovement = " ";
-
+                if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+                
+            }
                 goto exitPACMAN;
+            }
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+                
             }
             pacman.move(-20,0);
 
@@ -50,15 +68,34 @@ void* PACMAN(void* input){
 
             if(Grid[((int)pacman.getPosition().y/20)-1][((int)pacman.getPosition().x/20)] == 1){
             pacMovement = " ";
-
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+               
+            }
             goto exitPACMAN;
+            }
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+                
             }
             pacman.move(0,-20);
         }
         else if(pacMovement == "D"){
             if(Grid[((int)pacman.getPosition().y/20)+1][((int)pacman.getPosition().x/20)] == 1){
             pacMovement = " ";
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+                
+            }
             goto exitPACMAN;
+            }
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+                
             }
             pacman.move(0,20);
         }
@@ -66,7 +103,9 @@ void* PACMAN(void* input){
         }     //sample critical section.
         //check for wall colision based on current movement direction..
         exitPACMAN:
+        for(int i=0;i<2;i++){
         sem_post(&reader);
+        }
         readCount = 1;
         //write.
     }
@@ -91,7 +130,9 @@ void* GameEngine(void* input){
                 window.close();
             }
         }
-        sem_wait(&reader); // will probably go the value 5.
+        
+        sem_wait(&reader); //lock for writing
+         // will probably go the value 5.
         //input thread is also the gameEngine thread.
         if(Keyboard::isKeyPressed(Keyboard::A)){
                 pacMovement = "L";
@@ -109,11 +150,22 @@ void* GameEngine(void* input){
         pthread_mutex_lock(&lock);
         window.clear();
         window.draw(background); //read function
-        window.draw(pacman); //read function
+        for(int i=1;i<=29;i++){
+            for(int j=1;j<=24;j++){
+                if(pellets[i][j].status){ //written by pacman.
+                    window.draw(pellets[i][j].coin);
+                }
+            }
+        }
+        window.draw(pacman); //written by pacman for x and y position.
+        window.draw(score);
+        window.draw(pointNum);
+       //read function
         window.display();
         window.setActive(false);
-        sem_post(&reader2);
         pthread_mutex_unlock(&lock);
+        sem_post(&reader2);
+        
     }
     pthread_exit(0);
 }
@@ -125,7 +177,31 @@ void* UserInterface(void* input){
         background.setTexture(bgt);
         pc.loadFromFile("pset.png");
         pacman.setTexture(pc);
-        pacman.setPosition(20,20);
+        pacman.setPosition(12*20,17*20);
+        Coin.loadFromFile("/home/ibtehaj/projTest/pelletp.png");
+        retro.loadFromFile("/home/ibtehaj/projTest/Emulogic-zrEw.ttf");
+        score.setFont(retro);
+        score.setString("SCORE:");
+        score.setPosition(150,370);
+        score.setCharacterSize(16);
+        score.setFillColor(sf::Color::Yellow);
+        pointNum.setFont(retro);
+        pointNum.setString("0");
+        pointNum.setPosition(260,370);
+        pointNum.setCharacterSize(16);
+        pointNum.setFillColor(sf::Color::Yellow);
+        //load pellets and theri initial positions according to places on the grid.
+        for(int i=0;i<30;i++){
+            for(int j=0;j<25;j++){
+                if(Grid[i][j] == 0){
+                    pellets[i][j].coin.setTexture(Coin);
+                    pellets[i][j].coin.setPosition(j*20,i*20);
+                }
+                else{
+                pellets[i][j].status = false;
+                }
+            }
+        }
         //ui initializer
         while(1){
             if(GAME == false){
@@ -147,6 +223,10 @@ void* UserInterface(void* input){
          pthread_mutex_lock(&lock);
             pacman.setTextureRect(IntRect(0,frame*20,20,20)); //sample critical section.
          pthread_mutex_unlock(&lock);
+            //score will also be set inside this thread.
+            sem_wait(&reader);
+            pointNum.setString(to_string(points)); //currently receiving a little too late. not entirely synced with the pacman write need to cater that.
+         
         }
     pthread_exit(0);
 }
@@ -154,8 +234,9 @@ void* UserInterface(void* input){
 int main(){
     pthread_t win,ui;
     window.setActive(false);
-    sem_init(&reader,0,0);
+    sem_init(&reader,0,2);
     sem_init(&reader2,0,0);
+    sem_init(&readCounter,0,2);
     pthread_create(&win,0,GameEngine,(void*)500);
     pthread_create(&ui,0,UserInterface,0);
     pthread_exit(0);
