@@ -19,4 +19,5 @@ bool allThreadKiller = false;
 Clock pacClock;
 int readCount = 0; //initially set the read count to zero to basically restrict the write lock mechanism.
 sem_t reader;
+sem_t reader2;
 //signal all threads to finish execution.
