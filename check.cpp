@@ -28,6 +28,7 @@ void* GHOST1(void* input){
         int* Estart = new int[2] {(int)(ghost1.getPosition().y / CELL_SIZE), (int)(ghost1.getPosition().x / CELL_SIZE)};
         int* Eend = new int[2] {(int)(pacman.getPosition().y / CELL_SIZE), (int)(pacman.getPosition().x / CELL_SIZE)};
         ghostPath = FindShortestPath(Estart, Eend);
+        sem_wait(&reader3);
         move_enemy(ghostPath, ghost1, c1);
     }
     pthread_exit(0);
@@ -51,7 +52,7 @@ void* GHOST2(void* input){
         timer += c2.getElapsedTime().asMilliseconds();
         c2.restart();
 
-        sem_wait(&reader3);
+        sem_wait(&reader4);
 
         if(timer >= 200){
 
@@ -142,6 +143,7 @@ void* GHOST3(void* input){
         int* Estart = new int[2] {(int)(ghost3.getPosition().y / CELL_SIZE), (int)(ghost3.getPosition().x / CELL_SIZE)};
         int* Eend = new int[2] {(int)(pacman.getPosition().y / CELL_SIZE), (int)(pacman.getPosition().x / CELL_SIZE)};
         ghostPath = FindShortestPath(Estart, Eend);
+        sem_wait(&reader5);
         move_enemy(ghostPath, ghost3, c3);
     }
 
@@ -162,6 +164,7 @@ void* GHOST4(void* input){
         int* Estart = new int[2] {(int)(ghost4.getPosition().y / CELL_SIZE), (int)(ghost4.getPosition().x / CELL_SIZE)};
         int* Eend = new int[2] {(int)(pacman.getPosition().y / CELL_SIZE), (int)(pacman.getPosition().x / CELL_SIZE)};
         ghostPath = FindShortestPath(Estart, Eend);
+        sem_wait(&reader6);
         move_enemy(ghostPath, ghost4, c4);
     }
 
@@ -297,6 +300,7 @@ void* GameEngine(void* input){
     pthread_create(&ghost2Thread,0,GHOST2,0);
     pthread_create(&ghost3Thread,0,GHOST3,0);
     pthread_create(&ghost4Thread,0,GHOST4,0);
+    
     //ghost threads calling ends here.
 
     while (window.isOpen())
@@ -356,7 +360,11 @@ void* GameEngine(void* input){
         pthread_mutex_unlock(&lock);
         
         sem_post(&reader2);
-        sem_post(&reader3);        
+        sem_post(&reader3);  
+        sem_post(&reader4);        
+        sem_post(&reader5);        
+        sem_post(&reader6);        
+
     }
     pthread_exit(0);
 }
@@ -370,7 +378,7 @@ void* UserInterface(void* input){
         pc.loadFromFile("img/pset.png");
         pacman.setTexture(pc);
         pacman.setPosition(12*20,17*20);
-        Coin.loadFromFile("img/g4.png");
+        // Coin.loadFromFile("img/g4.png");
         retro.loadFromFile("Emulogic-zrEw.ttf");
         score.setFont(retro);
         score.setString("SCORE:");
@@ -433,8 +441,6 @@ void* UserInterface(void* input){
 
             sem_wait(&reader);
             pointNum.setString(to_string(points)); //currently receiving a little too late. not entirely synced with the pacman write need to cater that.
-
-
         }
     pthread_exit(0);
 }
@@ -447,9 +453,13 @@ int main(){
 
     sem_init(&reader,0,2);
     sem_init(&reader2,0,0);
-    sem_init(&reader3,0,0); // *under experiment* for ghost 2 random movement 
-    sem_init(&readCounter,0,2);
 
+    sem_init(&reader3,0,0); // *under experiment* for ghost movement 
+    sem_init(&reader4,0,0); // *under experiment* for ghost movement 
+    sem_init(&reader5,0,0); // *under experiment* for ghost movement 
+    sem_init(&reader6,0,0); // *under experiment* for ghost movement 
+
+    // sem_init(&readCounter,0,2);
 
     sem_init(&keyPermit,0,2); //For ghost Leaving logic
     sem_init(&exitPermit,0,2); 
