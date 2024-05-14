@@ -18,17 +18,18 @@ bool GAME = true;
 std::string pacMovement = " ";
 pthread_attr_t unlinker;
 bool allThreadKiller = false;
-Clock pacClock;
+Clock pacClock,lifeClock;
 int readCount = 0; //initially set the read count to zero to basically restrict the write lock mechanism.
 sem_t reader; //full
 sem_t reader2;
 sem_t reader3;
 
 int readCounter; //allow upto 3 threads for now.
-Text score;
-Text pointNum;
+Text score,lives;
+Text pointNum,lifeNum;
 Font retro;
-int points;
+bool lifeTrue = true;
+int points,life = 3;
 int sheetcol = 0;
 struct pellet
 {
@@ -37,7 +38,7 @@ struct pellet
 };
 struct pellet pellets[30][25];
 sem_t pacWrite; //empty
-int value;
+int value,numReaders;
 sem_t keyPermit, exitPermit; 
 Clock c1,c2,c3,c4;   //For each ghost
 Sprite ghost1,ghost2,ghost3,ghost4;
