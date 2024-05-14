@@ -30,9 +30,15 @@ void* GHOST1(void* input){
         int* Estart = new int[2] {(int)(ghost1.getPosition().y / CELL_SIZE), (int)(ghost1.getPosition().x / CELL_SIZE)};
         sem_wait(&mute);
         int* Eend = new int[2] {(int)(pacman.getPosition().y / CELL_SIZE), (int)(pacman.getPosition().x / CELL_SIZE)};
+        if(pacman.getPosition().x == ghost1.getPosition().x && pacman.getPosition().y == ghost1.getPosition().y){
+            if(lifeTrue){
+            life--;
+            lifeTrue = false; //to allow only one decrement at a time.
+            }
+        }
         sem_post(&mute);
         sem_getvalue(&pacWrite,&value);
-        if(value < 4)
+        if(value < numReaders)
         sem_post(&pacWrite);
         ghostPath = FindShortestPath(Estart, Eend);
         move_enemy(ghostPath, ghost1, c1);
@@ -153,7 +159,7 @@ void* GHOST3(void* input){
         int* Eend = new int[2] {(int)(pacman.getPosition().y / CELL_SIZE), (int)(pacman.getPosition().x / CELL_SIZE)};
         sem_post(&mute);
         sem_getvalue(&pacWrite,&value);
-        if(value < 4)
+        if(value < numReaders)
         sem_post(&pacWrite);
         ghostPath = FindShortestPath(Estart, Eend);
         move_enemy(ghostPath, ghost3, c3);
@@ -179,7 +185,7 @@ void* GHOST4(void* input){
         int* Eend = new int[2] {(int)(pacman.getPosition().y / CELL_SIZE), (int)(pacman.getPosition().x / CELL_SIZE)};
         sem_post(&mute);
         sem_getvalue(&pacWrite,&value);
-        if(value < 5)
+        if(value < numReaders)
         sem_post(&pacWrite);
         ghostPath = FindShortestPath(Estart, Eend);
         move_enemy(ghostPath, ghost4, c4);
@@ -192,12 +198,14 @@ void* GHOST4(void* input){
 void* PACMAN(void* input){
     float timer;
     //sem_post(&reader);
-
+    float lifeTimer;
     while(1){
         //do something
         
         timer += pacClock.getElapsedTime().asMilliseconds();
+        lifeTimer += lifeClock.getElapsedTime().asSeconds();
         pacClock.restart();
+        lifeClock.restart();
         //all movement is locked under a critical section
 
         if(pacMovement== " "){
@@ -207,12 +215,16 @@ void* PACMAN(void* input){
         sem_wait(&reader2); //game engine gives access to pacman for write
         //game grid reading semaphore -> 4 ghosts and 1 pacman grid access.
         sem_getvalue(&pacWrite,&value);
-        if(timer >= 200 && value == 4){ //timer checks if current access is viable to write
+        if(timer >= 200 && value == numReaders){ //timer checks if current access is viable to write
             //pacman writes here.
-            for(int i=0;i<4;i++){
+            for(int i=0;i<numReaders;i++){
                 sem_wait(&pacWrite);
             }
             sem_wait(&mute);
+            if(lifeTimer >= 2 && !lifeTrue){
+                lifeTimer = 0;
+                lifeTrue = true;
+            }
          if(pacMovement == "R"){
             if(Grid[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)+1] == 1){
             pacMovement = " "; //made a semaphore to give access to the written values for movement by the game engine.             
@@ -297,7 +309,7 @@ void* PACMAN(void* input){
         //check for wall colision based on current movement direction..
         exitPACMAN: 
         sem_post(&mute);
-        for(int i=0;i<4;i++){
+        for(int i=0;i<numReaders;i++){
             sem_post(&reader);
         }
         readCount = 1;
@@ -319,10 +331,10 @@ void* GameEngine(void* input){
     pthread_t ghost1Thread, ghost2Thread, ghost3Thread, ghost4Thread;
     pthread_create(&ghost1Thread,0,GHOST1,0);
     //pthread_create(&ghost2Thread,0,GHOST2,0);
-    pthread_create(&ghost3Thread,0,GHOST3,0);
+    //pthread_create(&ghost3Thread,0,GHOST3,0);
     //pthread_create(&ghost4Thread,0,GHOST4,0);
     //ghost threads calling ends here.
-
+    
     while (window.isOpen())
     {
         sf::Event event;
@@ -374,14 +386,16 @@ void* GameEngine(void* input){
         sem_wait(&mute);
         window.draw(pacman); //written by pacman for x and y position.
         window.draw(pointNum);
+        window.draw(lifeNum);
         sem_post(&mute);
         window.draw(score);
+        window.draw(lives);
         sem_getvalue(&pacWrite,&value);
-        if(value < 4)
+        if(value < numReaders)
         sem_post(&pacWrite);
         window.draw(ghost1);
-        window.draw(ghost3);
-        window.draw(ghost4);
+        //window.draw(ghost3);
+        //window.draw(ghost4);
         // if(sem_trywait(&reader3)){
         // window.draw(ghost2);
         // sem_post(&reader3);
@@ -409,14 +423,24 @@ void* UserInterface(void* input){
         retro.loadFromFile("Emulogic-zrEw.ttf");
         score.setFont(retro);
         score.setString("SCORE:");
-        score.setPosition(150,370);
+        score.setPosition(170,370);
         score.setCharacterSize(16);
         score.setFillColor(sf::Color::Yellow);
         pointNum.setFont(retro);
         pointNum.setString("0");
-        pointNum.setPosition(260,370);
+        pointNum.setPosition(280,370);
         pointNum.setCharacterSize(16);
         pointNum.setFillColor(sf::Color::Yellow);
+        lives.setFont(retro);
+        lives.setString("LIVES");
+        lives.setPosition(50,370);
+        lives.setCharacterSize(12);
+        lives.setFillColor(sf::Color::Red);
+        lifeNum.setFont(retro);
+        lifeNum.setString(to_string(life));
+        lifeNum.setPosition(70,390);
+        lifeNum.setCharacterSize(12);
+        lifeNum.setFillColor(sf::Color::Red);
         //load pellets and theri initial positions according to places on the grid.
         for(int i=0;i<30;i++){
             for(int j=0;j<25;j++){
@@ -475,9 +499,10 @@ void* UserInterface(void* input){
             sem_wait(&reader);
             sem_wait(&mute);
             pointNum.setString(to_string(points)); //currently receiving a little too late. not entirely synced with the pacman write need to cater that.
+            lifeNum.setString(to_string(life));
             sem_post(&mute);
             sem_getvalue(&pacWrite,&value);
-            if(value < 4)
+            if(value < numReaders)
             sem_post(&pacWrite);
 
         }
@@ -487,17 +512,17 @@ void* UserInterface(void* input){
 int main(){
     pthread_t win,ui;
     window.setActive(false);
-
+    numReaders = 3;
     srand(time(0));
 
-    sem_init(&reader,0,4);
-    for(int i=0;i<4;i++){
+    sem_init(&reader,0,numReaders);
+    for(int i=0;i<numReaders;i++){
         sem_wait(&reader);
     }
     sem_init(&reader2,0,0);
     sem_init(&reader3,0,0); // *under experiment* for ghost 2 random movement 
     //sem_init(&readCounter,0,2);
-    sem_init(&pacWrite,0,4); //for now
+    sem_init(&pacWrite,0,numReaders); //for now
     sem_init(&mute,0,1);
     sem_init(&keyPermit,0,2); //For ghost Leaving logic
     sem_init(&exitPermit,0,2); 
