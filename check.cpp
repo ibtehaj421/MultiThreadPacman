@@ -185,14 +185,25 @@ void* PACMAN(void* input){
             goto exitPACMAN;
         }
         sem_wait(&reader2);
+        //game grid reading semaphore -> 4 ghosts and 1 pacman grid access.
 
         if(timer >= 200){
 
          if(pacMovement == "R"){
             if(Grid[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)+1] == 1){
-            pacMovement = " ";
-             
+            pacMovement = " "; //made a semaphore to give access to the written values for movement by the game engine.             
+           
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+
+            }
             goto exitPACMAN;
+            }
+
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
             }
             pacman.move(20,0);
            
@@ -203,7 +214,18 @@ void* PACMAN(void* input){
                 //pacman.move(1,0);
                 pacMovement = " ";
                 
+                if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+
+            }                
                 goto exitPACMAN;
+            }
+
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+
             }
             pacman.move(-20,0);
            
@@ -212,9 +234,20 @@ void* PACMAN(void* input){
             
             if(Grid[((int)pacman.getPosition().y/20)-1][((int)pacman.getPosition().x/20)] == 1){
             pacMovement = " ";
-           
+            
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+
+            }
+
             goto exitPACMAN;
             }
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+
+            }            
             pacman.move(0,-20);
              
         }
@@ -222,9 +255,17 @@ void* PACMAN(void* input){
             
             if(Grid[((int)pacman.getPosition().y/20)+1][((int)pacman.getPosition().x/20)] == 1){
             pacMovement = " ";
-           
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+
+            }
             goto exitPACMAN;
             }
+            if(pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status){
+                pellets[(int)pacman.getPosition().y/20][((int)pacman.getPosition().x/20)].status = false;
+                points++;
+            }            
             pacman.move(0,20);
            
         }
@@ -232,7 +273,9 @@ void* PACMAN(void* input){
         }     //sample critical section.
         //check for wall colision based on current movement direction..
         exitPACMAN:
+        for(int i=0;i<2;i++){        
         sem_post(&reader);
+        }
         readCount = 1;
         //write
     }  
@@ -267,8 +310,9 @@ void* GameEngine(void* input){
             }
         }
         
-        sem_wait(&reader);
-        
+        sem_wait(&reader); //lock for writing
+         // will probably go the value 5.
+
         //input thread is also the gameEngine thread.
         if(Keyboard::isKeyPressed(Keyboard::A)){
                 pacMovement = "L";
@@ -288,8 +332,18 @@ void* GameEngine(void* input){
         pthread_mutex_lock(&lock);
         window.clear();
         window.draw(background); //read function
-        window.draw(pacman); //read function
 
+        for(int i=1;i<=29;i++){
+            for(int j=1;j<=24;j++){
+                if(pellets[i][j].status){ //written by pacman.
+                    window.draw(pellets[i][j].coin);
+                }
+            }
+        }
+        window.draw(pacman); //written by pacman for x and y position.
+        window.draw(score);
+        window.draw(pointNum);
+       
         window.draw(ghost1);
         window.draw(ghost2);
         window.draw(ghost3);
@@ -298,9 +352,11 @@ void* GameEngine(void* input){
         window.display();
         window.setActive(false);
         // sem_post(&reader);
-        sem_post(&reader2);
-        sem_post(&reader3);
+
         pthread_mutex_unlock(&lock);
+        
+        sem_post(&reader2);
+        sem_post(&reader3);        
     }
     pthread_exit(0);
 }
@@ -313,8 +369,32 @@ void* UserInterface(void* input){
         background.setTexture(bgt);
         pc.loadFromFile("img/pset.png");
         pacman.setTexture(pc);
-        pacman.setPosition(20,20);
-        
+        pacman.setPosition(12*20,17*20);
+        Coin.loadFromFile("img/g4.png");
+        retro.loadFromFile("Emulogic-zrEw.ttf");
+        score.setFont(retro);
+        score.setString("SCORE:");
+        score.setPosition(150,370);
+        score.setCharacterSize(16);
+        score.setFillColor(sf::Color::Yellow);
+        pointNum.setFont(retro);
+        pointNum.setString("0");
+        pointNum.setPosition(260,370);
+        pointNum.setCharacterSize(16);
+        pointNum.setFillColor(sf::Color::Yellow);
+        //load pellets and theri initial positions according to places on the grid.
+        for(int i=0;i<30;i++){
+            for(int j=0;j<25;j++){
+                if(Grid[i][j] == 0){
+                    pellets[i][j].coin.setTexture(Coin);
+                    pellets[i][j].coin.setPosition(j*20,i*20);
+                }
+                else{
+                pellets[i][j].status = false;
+                }
+            }
+        }
+
         //ghosts
         g1.loadFromFile("img/g1.png");
         ghost1.setTexture(g1);
@@ -350,6 +430,11 @@ void* UserInterface(void* input){
          pthread_mutex_lock(&lock);
             pacman.setTextureRect(IntRect(0,frame*20,20,20)); //sample critical section.
          pthread_mutex_unlock(&lock);
+
+            sem_wait(&reader);
+            pointNum.setString(to_string(points)); //currently receiving a little too late. not entirely synced with the pacman write need to cater that.
+
+
         }
     pthread_exit(0);
 }
@@ -360,9 +445,11 @@ int main(){
 
     srand(time(0));
 
-    sem_init(&reader,0,0);
+    sem_init(&reader,0,2);
     sem_init(&reader2,0,0);
     sem_init(&reader3,0,0); // *under experiment* for ghost 2 random movement 
+    sem_init(&readCounter,0,2);
+
 
     sem_init(&keyPermit,0,2); //For ghost Leaving logic
     sem_init(&exitPermit,0,2); 
